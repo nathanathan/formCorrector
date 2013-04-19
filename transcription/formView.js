@@ -32,20 +32,11 @@ function computeTextLocation(field) {
         y: avgY
     };
 }
-function renderMarkedupForm(form){
-    var formLocation = getParameter('formLocation', "");
-    var selectedSegment = getParameter('segment');
-    var formId = getParameter("formId");
-    if(selectedSegment){
-		var $doneBtn = $('<button class="btn btn-primary">Done</button>');
-		$doneBtn.click(function(){
-			window.close();
-		});
-		$('body').append($('<center>').append($doneBtn));
-    }
+function renderMarkedupForm(form, formLocation){
+
     $(".canvasContainer").html('<canvas id="myCanvas">');
     var $canvas = $("#myCanvas").jCanvas();
-    $(".main-image").attr('src', formLocation + "aligned.jpg");
+    $(".main-image").attr('src', sfsf.joinPaths(formLocation, "aligned.jpg"));
     $(".main-image").load(function() {
         $canvas.attr('height', $(this).height());
         $canvas.attr('width', $(this).width());
@@ -62,6 +53,7 @@ function renderMarkedupForm(form){
                 progress += 90 / numFields;
                 $bar.css('width', progress + '%');
 				
+                /*
                 if (selectedSegment) {
                     $(field.segments).each(
                 
@@ -92,6 +84,7 @@ function renderMarkedupForm(form){
                     });
                     return;
                 }
+                */
 				
                 var textLocation, textLayerParams, textLayer;
                 if(typeof field.markup_location === 'undefined'){
@@ -119,10 +112,9 @@ function renderMarkedupForm(form){
                     var segment = this;
                     if (segment.quad) {
                         var quad = segment.quad;
-                        var isSelected = (selectedSegment == field.name + '_image_' + segment_idx);
                         var strokeStyle = "#00ff09";
                         if(typeof field.transcription === 'undefined'){
-                        	strokeStyle = isSelected ? "#fff200" : "#ffb700";
+                        	strokeStyle = "#ffb700";
                         }
                         var createModal = function(){
                             //TODO: Do this with a template.
@@ -131,7 +123,7 @@ function renderMarkedupForm(form){
                             $body.empty();
                             $(field.segments).each(function(segment_idx) {
                                 $body.append(
-                                $('<img>').attr('src', formLocation + "segments/" + field.name + '_image_' + segment_idx + '.jpg'));
+                                $('<img>').attr('src', sfsf.joinPaths(formLocation, "segments", field.name + '_image_' + segment_idx + '.jpg')));
                             });
 		                    $('.modal-header').find('h3').text(field.label || field.name);
                             var $control;
@@ -200,22 +192,21 @@ function renderMarkedupForm(form){
                         function(item_idx, item) {
                             $canvas.addLayer({
                                 method: "drawRect",
-                                strokeStyle: item.classification ? "#00ff44" : "#ff00ff",
-                                strokeWidth: 3,
-                                opacity: .4,
+                                fillStyle: item.classification ? "#00ff44" : "#ff00ff",
+                                opacity: .3,
                                 fromCenter: true,
                                 x: item.absolute_location[0],
                                 y: item.absolute_location[1],
-                                width: 5,
-                                height: 5,
+                                width: 6,
+                                height: 10,
                                 click: function(layer) {
                                     item.classification = !item.classification;
-                                    var segmentQuad = $(this);//.strokeStyle: "#00ff09";
+                                    var segmentQuad = $(this);
                                     var oldclick = layer.click;
                                     //disable click during animation.
                                     layer.click = function() {};
                                     segmentQuad.animateLayer(layer, {
-                                        strokeStyle: item.classification ? "#00ff44" : "#ff00ff"
+                                        fillStyle: item.classification ? "#00ff44" : "#ff00ff"
                                     }, 10, function() {
                                         //re-enable click.
                                         layer.click = oldclick;
@@ -232,13 +223,17 @@ function renderMarkedupForm(form){
                 }, 1000);
             }
             $canvas.click();
-
+            $(document).keydown(function(){
+                $(".main-image").css('z-index', 1000);
+            });
+            $(document).keyup(function(){
+                $(".main-image").css('z-index', 100);
+            });
 
     });
 
 }
 
-var formLocation = getParameter('formLocation', "");
 jQuery(function($) {
     sfsf.readEntriesWithMetadata('scan', function(err, entries){
         if(err){
@@ -246,17 +241,21 @@ jQuery(function($) {
         }
         console.log(entries);
         var $forms = $('.forms');
-        _.each(entries, function(entry){
+        _.each(_.sortBy(entries, "name"), function(entry){
             var $entryBtn = $('<a class="btn">');
             $entryBtn.text(entry.name);
             $forms.append($entryBtn);
             $entryBtn.click(function(){
+                if(!confirm('Are you sure? (Have you saved?)')) {
+                    return;
+                }
+                $entryBtn.addClass('btn-info');
                 $.getJSON(sfsf.joinPaths(entry.toURL(), "output.json"), function(myJson){
-                    renderMarkedupForm(myJson);
+                    renderMarkedupForm(myJson, entry.toURL());
                     $('.saveOut').unbind('click');
                     $('.saveOut').click(function(){
                         sfsf.cretrieve(sfsf.joinPaths(entry.fullPath, "output.json"),
-                        {data: JSON.stringify(myJson,null,2) },
+                        { data: JSON.stringify(myJson,null,2) },
                         function(err){
                             if(err){
                                 console.errror(err);

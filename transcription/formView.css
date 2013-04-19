@@ -17,3 +17,6 @@ body {
     top:50px;
 	left:15px;
 }
+.main-image {
+    position: absolute;
+}
